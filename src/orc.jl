@@ -39,7 +39,12 @@ struct OrcModule
 end
 Base.convert(::Type{API.LLVMOrcModuleHandle}, mod::OrcModule) = mod.handle
 
-function compile!(orc::OrcJIT, mod::Module, resolver = C_NULL, ctx = C_NULL; lazy=false)
+function default_resolver(name, ctx)
+    name = unsafe_string(name)
+    error("Undefined symbol $name")
+end
+
+function compile!(orc::OrcJIT, mod::Module, resolver = @cfunction(default_resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL; lazy=false)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     if lazy
         API.LLVMOrcAddLazilyCompiledIR(orc, r_mod, mod, resolver, ctx)
@@ -53,7 +58,7 @@ function Base.delete!(orc::OrcJIT, mod::OrcModule)
     LLVM.API.LLVMOrcRemoveModule(orc, mod)
 end
 
-function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = C_NULL, ctx = C_NULL)
+function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = @cfunction(default_resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     API.LLVMOrcAddObjectFile(orc, r_mod, obj, resolver, ctx)
     return OrcModule(r_mod[])
