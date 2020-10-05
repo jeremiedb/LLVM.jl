@@ -84,7 +84,7 @@ function resolver(name, ctx)
     return UInt64(reinterpret(UInt, ptr))
 end
 
-function compile!(orc::OrcJIT, mod::Module, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL; lazy=false)
+function compile!(orc::OrcJIT, mod::Module, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = orc; lazy=false)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     if lazy
         API.LLVMOrcAddLazilyCompiledIR(orc, r_mod, mod, resolver, ctx)
@@ -98,7 +98,7 @@ function Base.delete!(orc::OrcJIT, mod::OrcModule)
     LLVM.API.LLVMOrcRemoveModule(orc, mod)
 end
 
-function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL)
+function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = orc)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     API.LLVMOrcAddObjectFile(orc, r_mod, obj, resolver, ctx)
     return OrcModule(r_mod[])

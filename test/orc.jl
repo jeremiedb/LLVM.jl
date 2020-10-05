@@ -89,7 +89,7 @@ end
 
     f_lookup = @cfunction($lookup, UInt64, (Cstring, Ptr{Cvoid}))
     GC.@preserve f_lookup begin
-        orc_mod = compile!(orc, mod, f_lookup, lazy=true) # will capture f_lookup
+        orc_mod = compile!(orc, mod, f_lookup, C_NULL, lazy=true) # will capture f_lookup
 
         addr = address(orc, fname)
         @test errormsg(orc) == ""
@@ -143,7 +143,7 @@ end
 
     create_stub!(orc, "mysum", OrcTargetAddress(@cfunction(+, Int32, (Int32, Int32))))
 
-    orc_mod = compile!(orc, mod, @cfunction(LLVM.resolver, UInt64, (Cstring, Ptr{Cvoid})), orc)
+    orc_mod = compile!(orc, mod)
 
     addr = address(orc, fname)
     @test errormsg(orc) == ""
