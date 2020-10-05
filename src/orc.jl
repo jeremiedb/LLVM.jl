@@ -39,12 +39,52 @@ struct OrcModule
 end
 Base.convert(::Type{API.LLVMOrcModuleHandle}, mod::OrcModule) = mod.handle
 
-function default_resolver(name, ctx)
+"""
+   resolver(name, ctx)
+
+Lookup the symbol `name`. Iff `ctx` is passed to this function it should be a
+pointer to the OrcJIT we are compiling for.
+"""
+function resolver(name, ctx)
     name = unsafe_string(name)
-    error("Undefined symbol $name")
+    ptr = try
+        ## Step 0: Should have already resolved it iff it was in the
+        ##         same module
+        ## Step 1: See if it's something known to the execution engine
+        if ctx != C_NULL
+            orc = OrcJIT(ctx)
+            ptr = pointer(address(orc, name))
+        else
+            ptr = C_NULL
+        end
+
+        ## Step 2: Search the program symbols
+        if ptr == C_NULL
+            #
+            # SearchForAddressOfSymbol expects an unmangled 'C' symbol name.
+            # Iff we are on Darwin, strip the leading '_' off.
+            @static if Sys.isapple()
+                if name[1] == '_'
+                    name = name[2:end]
+                end
+            end
+            ptr = LLVM.find_symbol(name)
+        end
+        ## Step 4: Lookup in libatomic
+        # TODO: Do we need to do this?
+        ptr
+    catch ex
+        @error "OrcJIT: Lookup failed" name exception=(ex, Base.catch_backtrace())
+        C_NULL
+    end
+    if ptr === C_NULL
+        error("OrcJIT: Symbol `$name` lookup failed. Aborting!")
+    end
+
+    return UInt64(reinterpret(UInt, ptr))
 end
 
-function compile!(orc::OrcJIT, mod::Module, resolver = @cfunction(default_resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL; lazy=false)
+function compile!(orc::OrcJIT, mod::Module, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL; lazy=false)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     if lazy
         API.LLVMOrcAddLazilyCompiledIR(orc, r_mod, mod, resolver, ctx)
@@ -58,7 +98,7 @@ function Base.delete!(orc::OrcJIT, mod::OrcModule)
     LLVM.API.LLVMOrcRemoveModule(orc, mod)
 end
 
-function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = @cfunction(default_resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL)
+function add!(orc::OrcJIT, obj::MemoryBuffer, resolver = @cfunction(resolver, UInt64, (Cstring, Ptr{Cvoid})), ctx = C_NULL)
     r_mod = Ref{API.LLVMOrcModuleHandle}()
     API.LLVMOrcAddObjectFile(orc, r_mod, obj, resolver, ctx)
     return OrcModule(r_mod[])
