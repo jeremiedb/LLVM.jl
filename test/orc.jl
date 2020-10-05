@@ -4,6 +4,42 @@ let ctx = Context()
     tm  = JITTargetMachine()
     orc = OrcJIT(tm)
 
+    mod = LLVM.Module("jit", ctx)
+    T_Int32 = LLVM.Int32Type(ctx)
+    ft = LLVM.FunctionType(T_Int32, [T_Int32, T_Int32])
+    fn = LLVM.Function(mod, "mysum", ft)
+    linkage!(fn, LLVM.API.LLVMExternalLinkage)
+
+    fname = mangle(orc, "wrapper")
+    wrapper = LLVM.Function(mod, fname, ft)
+    # generate IR
+    Builder(ctx) do builder
+        entry = BasicBlock(wrapper, "entry", ctx)
+        position!(builder, entry)
+
+        tmp = call!(builder, fn, [parameters(wrapper)...])
+        ret!(builder, tmp)
+    end
+
+    triple!(mod, triple(tm))
+    ModulePassManager() do pm
+        add_library_info!(pm, triple(mod))
+        add_transform_info!(pm, tm)
+        run!(pm, mod)
+    end
+    verify(mod)
+
+    orc_mod = compile!(orc, mod)
+    @test_throws ErrorException address(orc, fname)
+
+    delete!(orc, orc_mod)
+    dispose(orc)
+end
+
+let ctx = Context()
+    tm  = JITTargetMachine()
+    orc = OrcJIT(tm)
+
     known_functions = Dict{String, OrcTargetAddress}()
     fnames = Dict{String, Int}()
     function lookup(name, ctx)
@@ -14,10 +50,10 @@ let ctx = Context()
             end
             fnames[name] += 1
 
-            return get(known_functions, name, OrcTargetAddress(C_NULL)).ptr
+            return known_functions[name].ptr
         catch ex
-            @error "Exception during lookup" exception=(ex, catch_backtrace())
-            return UInt64(0)
+            @error "Exception during lookup" name exception=(ex, catch_backtrace())
+            error("OrcJIT: Could not find symbol")
         end
     end
 
