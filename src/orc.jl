@@ -56,37 +56,32 @@ pointer to the OrcJIT we are compiling for.
 """
 function resolver(name, ctx)
     name = unsafe_string(name)
-    ptr = try
-        ## Step 0: Should have already resolved it iff it was in the
-        ##         same module
-        ## Step 1: See if it's something known to the execution engine
-        if ctx != C_NULL
-            orc = OrcJIT(ctx)
-            ptr = pointer(address(orc, name))
-        else
-            ptr = C_NULL
-        end
-
-        ## Step 2: Search the program symbols
-        if ptr == C_NULL
-            #
-            # SearchForAddressOfSymbol expects an unmangled 'C' symbol name.
-            # Iff we are on Darwin, strip the leading '_' off.
-            @static if Sys.isapple()
-                if name[1] == '_'
-                    name = name[2:end]
-                end
-            end
-            ptr = LLVM.find_symbol(name)
-        end
-        ## Step 4: Lookup in libatomic
-        # TODO: Do we need to do this?
-        ptr
-    catch ex
-        @error "OrcJIT: Lookup failed" name exception=(ex, Base.catch_backtrace())
-        C_NULL
+    ## Step 0: Should have already resolved it iff it was in the
+    ##         same module
+    ## Step 1: See if it's something known to the execution engine
+    ptr = C_NULL
+    if ctx != C_NULL
+        orc = OrcJIT(ctx)
+        ptr = pointer(address(orc, name))
     end
-    if ptr === C_NULL
+
+    ## Step 2: Search the program symbols
+    if ptr == C_NULL
+        #
+        # SearchForAddressOfSymbol expects an unmangled 'C' symbol name.
+        # Iff we are on Darwin, strip the leading '_' off.
+        @static if Sys.isapple()
+            if name[1] == '_'
+                name = name[2:end]
+            end
+        end
+        ptr = LLVM.find_symbol(name)
+    end
+
+    ## Step 4: Lookup in libatomic
+    # TODO: Do we need to do this?
+
+    if ptr == C_NULL
         error("OrcJIT: Symbol `$name` lookup failed. Aborting!")
     end
 
