@@ -76,7 +76,7 @@ function __init__()
 
     @debug "Using LLVM $(version()) at $(Libdl.dlpath(libllvm[]))"
     if version() !== runtime_version()
-        @error "Using a different version of LLVM ($(runtime_version())) than the one shipped with Julia ($(version())); this is unsupported"
+        @warn "Using a different version of LLVM ($(runtime_version())) than the one shipped with Julia ($(version())); this is unsupported"
     end
 
     _install_handlers()
