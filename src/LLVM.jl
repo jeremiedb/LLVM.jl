@@ -72,7 +72,7 @@ function __init__()
     if length(libllvm_paths) > 1
         @warn "Multiple LLVM libraries loaded by Julia."
     end
-    libllvm[] = first(libllvm_paths)
+    libllvm[] = last(libllvm_paths)
 
     @debug "Using LLVM $(version()) at $(Libdl.dlpath(libllvm[]))"
     if version() !== runtime_version()
