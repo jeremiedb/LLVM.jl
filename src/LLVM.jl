@@ -70,8 +70,7 @@ function __init__()
             If you are, please file an issue and attach the output of `Libdl.dllist()`.""")
     end
     if length(libllvm_paths) > 1
-        warning("""
-            Multiple LLVM libraries loaded by Julia.""")
+        @warn "Multiple LLVM libraries loaded by Julia."
     end
     libllvm[] = first(libllvm_paths)
 
