@@ -70,9 +70,16 @@ function __init__()
             If you are, please file an issue and attach the output of `Libdl.dllist()`.""")
     end
     if length(libllvm_paths) > 1
-        @warn "Multiple LLVM libraries loaded by Julia."
+        julia_path = String(read(`which julia`))
+        julia_path_split = splitpath(julia_path)
+        libllvm_paths_split = splitpath.(libllvm_paths)
+        match_lib = map(x -> findlast(x[1:min(length(julia_path_split),end)] .== julia_path_split[1:min(length(x),end)]), libllvm_paths_split)
+        libllvm_path = libllvm_paths[findmax(match_lib)[2]]
+        @warn "Multiple LLVM libraries loaded by Julia: $(libllvm_paths).\nFollowing library will be linked: $(libllvm_path)."
+        libllvm[] = libllvm_path
+    else
+        libllvm[] = first(libllvm_paths)
     end
-    libllvm[] = last(libllvm_paths)
 
     @debug "Using LLVM $(version()) at $(Libdl.dlpath(libllvm[]))"
     if version() !== runtime_version()
