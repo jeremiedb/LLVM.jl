@@ -73,7 +73,7 @@ function __init__()
         julia_path = String(read(`which julia`))
         julia_path_split = splitpath(julia_path)
         libllvm_paths_split = splitpath.(libllvm_paths)
-        match_lib = map(x -> findlast(x[1:min(length(julia_path_split),end)] .== julia_path_split[1:min(length(x),end)]), libllvm_paths_split)
+        match_lib = map(x -> findlast(cumprod(x[1:min(length(julia_path_split),end)]) .== cumprod(julia_path_split[1:min(length(x),end)])), libllvm_paths_split)
         libllvm_path = libllvm_paths[findmax(match_lib)[2]]
         @warn "Multiple LLVM libraries loaded by Julia: $(libllvm_paths).\nFollowing library will be linked: $(libllvm_path)."
         libllvm[] = libllvm_path
